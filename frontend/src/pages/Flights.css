@@ -1,0 +1,122 @@
+.flights-page { padding-bottom: 60px; }
+
+.filter-bar { margin-bottom: 24px; }
+.filter-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.flights-list { display: flex; flex-direction: column; gap: 16px; }
+
+.flight-card {
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.flight-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  transform: translateY(-1px);
+}
+
+.flight-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.flight-number {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--gold-dark);
+  background: var(--gold-pale);
+  padding: 3px 10px;
+  border-radius: 4px;
+  margin-right: 10px;
+}
+
+.airline-name {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--dark);
+}
+
+.flight-route {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 18px;
+}
+
+.route-point { flex: 0 0 auto; }
+.route-point.right { text-align: right; }
+
+.route-code {
+  font-size: 26px;
+  font-weight: bold;
+  color: var(--dark);
+  line-height: 1.1;
+}
+
+.route-city { font-size: 11px; color: var(--text-soft); margin-top: 2px; }
+.route-time { font-size: 13px; font-weight: bold; color: var(--dark); margin-top: 4px; }
+
+.route-mid {
+  flex: 1;
+  text-align: center;
+  padding: 0 12px;
+}
+
+.route-duration {
+  font-size: 11px;
+  color: var(--gold-dark);
+  font-weight: bold;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+
+.route-line {
+  color: #bbb;
+  font-size: 11px;
+  letter-spacing: -1px;
+}
+
+.route-date {
+  font-size: 11px;
+  color: var(--text-soft);
+  margin-top: 4px;
+}
+
+.flight-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.flight-meta {
+  display: flex;
+  gap: 18px;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.flight-price-book {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.price-block { text-align: right; }
+.price-label { display: block; font-size: 11px; color: var(--gray); }
+.price-amount { font-size: 18px; font-weight: bold; color: var(--dark); }
+
+.admin-no-book {
+  font-size: 11px;
+  color: #999;
+  font-style: italic;
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border-radius: 6px;
+}

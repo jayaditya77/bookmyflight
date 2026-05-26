@@ -1,0 +1,50 @@
+.mybookings-page { padding-bottom: 60px; }
+.bookings-list { display: flex; flex-direction: column; gap: 14px; }
+
+.booking-card {}
+
+.booking-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.booking-ref {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--gold-dark);
+  font-family: monospace;
+  letter-spacing: 0.5px;
+}
+
+.booking-date { font-size: 11px; color: var(--gray); }
+
+.booking-flight-info {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 14px;
+  padding: 12px;
+  background: var(--bg);
+  border-radius: 7px;
+}
+
+.bf-route { display: flex; align-items: center; gap: 8px; }
+.bf-code { font-size: 22px; font-weight: bold; color: var(--dark); }
+.bf-arrow { font-size: 16px; color: var(--gold); }
+
+.bf-details div { font-size: 12px; color: var(--text-soft); margin-top: 3px; }
+.bf-details div:first-child { font-size: 13px; color: var(--dark); margin-top: 0; }
+
+.booking-meta {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.meta-item span { display: block; font-size: 10px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.4px; }
+.meta-item strong { font-size: 13px; color: var(--dark); }
