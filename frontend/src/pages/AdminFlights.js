@@ -43,32 +43,32 @@ export default function AdminFlights() {
   }, []);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    setSaving(true);
-    setError('');
-    setSuccess('');
+  setSaving(true);
+  setError('');
+  setSuccess('');
 
-    try {
-      if (editing) {
-        await API.put(`/flights/${editing}`, form);
-        setSuccess('Flight updated successfully.');
-      } else {
-        await API.post('/flights', form);
-        setSuccess('Flight added successfully.');
-      }
-
-      setForm(emptyForm);
-      setEditing(null);
-      setShowForm(false);
-
-      fetchFlights();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Save failed');
-    } finally {
-      setSaving(false);
+  try {
+    if (editing) {
+      await API.put(`/flights/${editing}`, form);
+      setSuccess("Flight updated successfully.");
+    } else {
+      await API.post('/flights', form);
+      setSuccess("Flight added successfully.");
     }
-  };
+
+    setForm(emptyForm);
+    setEditing(null);
+    setShowForm(false);
+
+    fetchFlights();
+  } catch (err) {
+    setError(err.response?.data?.message || 'Save failed');
+  } finally {
+    setSaving(false);
+  }
+};
 
   const handleEdit = (flight) => {
     setForm({
