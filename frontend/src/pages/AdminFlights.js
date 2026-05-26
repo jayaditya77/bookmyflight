@@ -1,4 +1,3 @@
-```js
 import React, { useEffect, useState } from 'react';
 import API from '../utils/api';
 
@@ -42,33 +41,33 @@ export default function AdminFlights() {
     fetchFlights();
   }, []);
 
- const handleSubmit = async (e) => {
-  e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  setSaving(true);
-  setError('');
-  setSuccess('');
+    setSaving(true);
+    setError('');
+    setSuccess('');
 
-  try {
-    if (editing) {
-      await API.put('/flights/' + editing, form);
-      setSuccess('Flight updated successfully.');
-    } else {
-      await API.post('/flights', form);
-      setSuccess('Flight added successfully.');
+    try {
+      if (editing) {
+        await API.put('/flights/' + editing, form);
+        setSuccess('Flight updated successfully.');
+      } else {
+        await API.post('/flights', form);
+        setSuccess('Flight added successfully.');
+      }
+
+      setForm(emptyForm);
+      setEditing(null);
+      setShowForm(false);
+
+      fetchFlights();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Save failed');
+    } finally {
+      setSaving(false);
     }
-
-    setForm(emptyForm);
-    setEditing(null);
-    setShowForm(false);
-
-    fetchFlights();
-  } catch (err) {
-    setError(err.response?.data?.message || 'Save failed');
-  } finally {
-    setSaving(false);
-  }
-};
+  };
 
   const handleEdit = (flight) => {
     setForm({
@@ -98,7 +97,7 @@ export default function AdminFlights() {
     if (!window.confirm('Delete this flight? This cannot be undone.')) return;
 
     try {
-      await API.delete(`/flights/${id}`);
+      await API.delete('/flights/' + id);
       setSuccess('Flight deleted.');
       fetchFlights();
     } catch (err) {
@@ -146,7 +145,7 @@ export default function AdminFlights() {
             setSuccess('');
           }}
         >
-          {showForm ? '✕ Close' : '+ Add Flight'}
+          {showForm ? 'Close' : '+ Add Flight'}
         </button>
       </div>
 
@@ -488,13 +487,13 @@ export default function AdminFlights() {
 
                   <td>
                     <span
-                      className={`badge ${
+                      className={
                         flight.status === 'scheduled'
-                          ? 'badge-green'
+                          ? 'badge badge-green'
                           : flight.status === 'cancelled'
-                          ? 'badge-red'
-                          : 'badge-gray'
-                      }`}
+                          ? 'badge badge-red'
+                          : 'badge badge-gray'
+                      }
                     >
                       {flight.status}
                     </span>
@@ -539,4 +538,3 @@ export default function AdminFlights() {
     </div>
   );
 }
-```
