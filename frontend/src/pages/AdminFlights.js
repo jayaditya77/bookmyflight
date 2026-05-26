@@ -42,7 +42,7 @@ export default function AdminFlights() {
     fetchFlights();
   }, []);
 
-  const handleSubmit = async (e) => {
+ const handleSubmit = async (e) => {
   e.preventDefault();
 
   setSaving(true);
@@ -51,11 +51,11 @@ export default function AdminFlights() {
 
   try {
     if (editing) {
-      await API.put(`/flights/${editing}`, form);
-      setSuccess("Flight updated successfully.");
+      await API.put('/flights/' + editing, form);
+      setSuccess('Flight updated successfully.');
     } else {
       await API.post('/flights', form);
-      setSuccess("Flight added successfully.");
+      setSuccess('Flight added successfully.');
     }
 
     setForm(emptyForm);
