@@ -84,10 +84,7 @@ export default function AdminFlights() {
       duration: flight.duration,
       aircraft: flight.aircraft || 'Boeing 737',
       totalSeats: flight.totalSeats,
-
-      // FIXED
       priceEconomy: flight.priceEconomy,
-
       status: flight.status
     });
 
@@ -331,12 +328,9 @@ export default function AdminFlights() {
                   min="100"
                   placeholder="e.g. 4500"
                   value={form.priceEconomy}
-
-                  // FIXED
                   onChange={(e) =>
                     f('priceEconomy', e.target.value)
                   }
-
                   required
                 />
               </div>
