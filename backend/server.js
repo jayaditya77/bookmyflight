@@ -18,6 +18,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/flights', require('./routes/flights'));
 app.use('/api/bookings', require('./routes/bookings'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/payment', require('./routes/payment'));
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'OK', message: 'BookMyFlight API running' }));
