@@ -24,6 +24,34 @@ export default function BookFlight() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
 
+
+  const lockSeat = async (seat) => {
+
+  try {
+
+    const { data } = await API.post(
+      '/bookings/lock-seat',
+      {
+        flightId: id,
+        seatNumber: seat.seatNumber
+      }
+    );
+
+    setSelectedSeat(seat);
+
+    alert('Seat locked for 5 minutes');
+
+  } catch (err) {
+
+    alert(
+      err.response?.data?.message ||
+      'Seat lock failed'
+    );
+
+  }
+
+};
+
   useEffect(() => {
     if (!user) {
       navigate('/login');
@@ -393,8 +421,8 @@ export default function BookFlight() {
                       className={`seat economy ${seat.isBooked ? 'booked' : ''} ${selectedSeat?.seatNumber === seat.seatNumber ? 'selected' : ''}`}
 
                       onClick={() =>
-                        !seat.isBooked &&
-                        setSelectedSeat(seat)
+                      !seat.isBooked &&
+                      lockSeat(seat)
                       }
 
                       title={`Seat ${seat.seatNumber} · Economy · ₹${flight.priceEconomy?.toLocaleString()}`}
@@ -430,8 +458,8 @@ export default function BookFlight() {
                       className={`seat economy ${seat.isBooked ? 'booked' : ''} ${selectedSeat?.seatNumber === seat.seatNumber ? 'selected' : ''}`}
 
                       onClick={() =>
-                        !seat.isBooked &&
-                        setSelectedSeat(seat)
+                      !seat.isBooked &&
+                      lockSeat(seat)
                       }
 
                       title={`Seat ${seat.seatNumber} · Economy · ₹${flight.priceEconomy?.toLocaleString()}`}

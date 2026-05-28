@@ -3,8 +3,53 @@ const router = express.Router();
 const Booking = require('../models/Booking');
 const Flight = require('../models/Flight');
 const { protect } = require('../middleware/auth');
+const redisClient = require('../config/redis');
 
 const sendBookingEmail = require('../utils/sendEmail');
+
+// Lock Seat
+router.post('/lock-seat', protect, async (req, res) => {
+
+  try {
+
+    const { flightId, seatNumber } = req.body;
+
+    const lockKey = `lock:${flightId}:${seatNumber}`;
+
+    // Check if already locked
+    const existingLock = await redisClient.get(lockKey);
+
+    if (existingLock) {
+
+      return res.status(400).json({
+        message: 'Seat temporarily locked by another user'
+      });
+
+    }
+
+    // Lock seat for 5 minutes
+    await redisClient.set(
+      lockKey,
+      req.user._id.toString(),
+      {
+        EX: 300
+      }
+    );
+
+    res.json({
+      message: 'Seat locked successfully',
+      expiresIn: 300
+    });
+
+  } catch (err) {
+
+    res.status(500).json({
+      message: err.message
+    });
+
+  }
+
+});
 
 // Book a flight — tourists only
 router.post('/', protect, async (req, res) => {
@@ -20,6 +65,26 @@ router.post('/', protect, async (req, res) => {
 
     if (!flight) {
       return res.status(404).json({ message: 'Flight not found' });
+    }
+
+    const lockKey = `lock:${flightId}:${seatNumber}`;
+
+    const seatLock = await redisClient.get(lockKey);
+
+    if (!seatLock) {
+
+      return res.status(400).json({
+        message: 'Seat lock expired. Please select seat again.'
+      });
+
+    }
+
+    if (seatLock !== req.user._id.toString()) {
+
+      return res.status(400).json({
+        message: 'Seat locked by another user.'
+      });
+
     }
 
     const seat = flight.seats.find(
@@ -44,6 +109,8 @@ router.post('/', protect, async (req, res) => {
     );
 
     await flight.save();
+
+    await redisClient.del(lockKey);
 
     const booking = await Booking.create({
 

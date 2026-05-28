@@ -2,14 +2,20 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
-
+require('./config/redis');
 dotenv.config();
 
 const app = express();
 
 app.use(cors({
-  origin: 'https://bookmyflight-xi.vercel.app',
+
+  origin: [
+    'https://bookmyflight-xi.vercel.app',
+    'http://localhost:3000'
+  ],
+
   credentials: true
+
 }));
 app.use(express.json());
 
