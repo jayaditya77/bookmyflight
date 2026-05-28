@@ -44,6 +44,8 @@ router.post('/', protect, async (req, res) => {
   'flightNumber airline origin destination departureDate departureTime arrivalTime originCode destinationCode'
 );
 
+console.log("EMAIL:", booking.passengerEmail);
+
 await sendBookingEmail(
   booking.passengerEmail,
   booking,
