@@ -4,6 +4,8 @@ const Booking = require('../models/Booking');
 const Flight = require('../models/Flight');
 const { protect } = require('../middleware/auth');
 
+const sendBookingEmail = require('../utils/sendEmail');
+
 // Book a flight — tourists only
 router.post('/', protect, async (req, res) => {
   if (req.user.role === 'admin') {
@@ -37,8 +39,18 @@ router.post('/', protect, async (req, res) => {
       amountPaid: flight.priceEconomy
     });
 
-    await booking.populate('flight', 'flightNumber airline origin destination departureDate departureTime arrivalTime');
-    res.status(201).json(booking);
+    await booking.populate(
+  'flight',
+  'flightNumber airline origin destination departureDate departureTime arrivalTime originCode destinationCode'
+);
+
+await sendBookingEmail(
+  booking.passengerEmail,
+  booking,
+  flight
+);
+
+res.status(201).json(booking);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
