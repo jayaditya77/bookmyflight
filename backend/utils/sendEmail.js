@@ -2,7 +2,11 @@ const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
 
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+
+  port: 587,
+
+  secure: false,
 
   auth: {
     user: process.env.EMAIL_USER,
@@ -17,71 +21,78 @@ const sendBookingEmail = async (
   flight
 ) => {
 
-  await transporter.sendMail({
+  try {
 
-    from: process.env.EMAIL_USER,
+    console.log("START EMAIL");
 
-    to,
+    const info = await transporter.sendMail({
 
-    subject: 'BookMyFlight Booking Confirmation',
+      from: process.env.EMAIL_USER,
 
-    html: `
+      to,
 
-      <div style="font-family: Arial; padding: 20px;">
+      subject: 'BookMyFlight Booking Confirmation',
 
-        <h2>
-          Booking Confirmed ✈
-        </h2>
+      html: `
 
-        <p>
-          Your flight has been booked successfully.
-        </p>
+        <div style="font-family: Arial; padding: 20px;">
 
-        <hr />
+          <h2>
+            Booking Confirmed ✈
+          </h2>
 
-        <p>
-          <strong>Booking Reference:</strong>
-          ${booking.bookingReference}
-        </p>
+          <p>
+            Your flight has been booked successfully.
+          </p>
 
-        <p>
-          <strong>Passenger:</strong>
-          ${booking.passengerName}
-        </p>
+          <hr />
 
-        <p>
-          <strong>Flight:</strong>
-          ${flight.flightNumber}
-        </p>
+          <p>
+            <strong>Passenger:</strong>
+            ${booking.passengerName}
+          </p>
 
-        <p>
-          <strong>Route:</strong>
-          ${flight.originCode}
-          →
-          ${flight.destinationCode}
-        </p>
+          <p>
+            <strong>Flight:</strong>
+            ${flight.flightNumber}
+          </p>
 
-        <p>
-          <strong>Seat:</strong>
-          ${booking.seatNumber}
-        </p>
+          <p>
+            <strong>Route:</strong>
+            ${flight.originCode}
+            →
+            ${flight.destinationCode}
+          </p>
 
-        <p>
-          <strong>Amount Paid:</strong>
-          ₹${booking.amountPaid}
-        </p>
+          <p>
+            <strong>Seat:</strong>
+            ${booking.seatNumber}
+          </p>
 
-        <hr />
+          <p>
+            <strong>Amount Paid:</strong>
+            ₹${booking.amountPaid}
+          </p>
 
-        <p>
-          Thank you for choosing
-          BookMyFlight.
-        </p>
+          <hr />
 
-      </div>
+          <p>
+            Thank you for choosing BookMyFlight.
+          </p>
 
-    `
-  });
+        </div>
+
+      `
+
+    });
+
+    console.log("EMAIL SENT:", info.response);
+
+  } catch (error) {
+
+    console.log("EMAIL ERROR:", error);
+
+  }
 
 };
 
