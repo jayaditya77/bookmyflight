@@ -19,11 +19,11 @@ router.post('/lock-seat', protect, async (req, res) => {
     // Check if already locked
     const existingLock = await redisClient.get(lockKey);
 
-    if (existingLock) {
+    if (existingLock && existingLock !== req.user._id.toString()) {
 
-      return res.status(400).json({
-        message: 'Seat temporarily locked by another user'
-      });
+    return res.status(400).json({
+    message: 'Seat temporarily locked by another user'
+    });
 
     }
 
@@ -99,7 +99,6 @@ router.post('/', protect, async (req, res) => {
       return res.status(400).json({ message: 'Seat already booked' });
     }
 
-    // Mark seat as booked
     seat.isBooked = true;
     seat.bookedBy = req.user._id;
 
