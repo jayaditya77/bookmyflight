@@ -1,5 +1,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
@@ -15,6 +18,7 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Navbar />
+
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
@@ -24,6 +28,14 @@ export default function App() {
           <Route path="/my-bookings" element={<MyBookings />} />
           <Route path="/admin/*" element={<Admin />} />
         </Routes>
+
+        <ToastContainer
+          position="top-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          closeOnClick
+          pauseOnHover
+        />
       </BrowserRouter>
     </AuthProvider>
   );

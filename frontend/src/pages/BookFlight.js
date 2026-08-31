@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { toast } from 'react-toastify';
 import API from '../utils/api';
 import './BookFlight.css';
 
@@ -24,33 +25,30 @@ export default function BookFlight() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
 
-
+  // LOCK SEAT
   const lockSeat = async (seat) => {
+    try {
+      await API.post(
+        '/bookings/lock-seat',
+        {
+          flightId: id,
+          seatNumber: seat.seatNumber
+        }
+      );
 
-  try {
+      setSelectedSeat(seat);
 
-    const { data } = await API.post(
-      '/bookings/lock-seat',
-      {
-        flightId: id,
-        seatNumber: seat.seatNumber
-      }
-    );
+      toast.success(
+        `Seat ${seat.seatNumber} locked for 5 minutes!`
+      );
 
-    setSelectedSeat(seat);
-
-    alert('Seat locked for 5 minutes');
-
-  } catch (err) {
-
-    alert(
-      err.response?.data?.message ||
-      'Seat lock failed'
-    );
-
-  }
-
-};
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message ||
+        'Seat lock failed'
+      );
+    }
+  };
 
   useEffect(() => {
     if (!user) {
@@ -74,13 +72,11 @@ export default function BookFlight() {
 
   // RAZORPAY PAYMENT
   const handlePayment = async () => {
-
     if (!selectedSeat) {
       return setError('Please select a seat first.');
     }
 
     try {
-
       const { data: order } = await API.post(
         '/payment/create-order',
         {
@@ -89,7 +85,6 @@ export default function BookFlight() {
       );
 
       const options = {
-
         key: process.env.REACT_APP_RAZORPAY_KEY_ID,
 
         amount: order.amount,
@@ -103,36 +98,26 @@ export default function BookFlight() {
         order_id: order.id,
 
         handler: async function (response) {
-
           try {
-
             const verify = await API.post(
               '/payment/verify',
               response
             );
 
             if (verify.data.success) {
-
               handleBook();
-
             } else {
-
               setError('Payment verification failed.');
-
             }
 
           } catch {
-
             setError('Payment verification failed.');
-
           }
-
         },
 
         theme: {
           color: '#d4af37'
         }
-
       };
 
       const razor = new window.Razorpay(options);
@@ -140,51 +125,37 @@ export default function BookFlight() {
       razor.open();
 
     } catch {
-
       setError('Payment failed.');
-
     }
-
   };
 
   // BOOK FLIGHT
   const handleBook = async () => {
-
     if (!selectedSeat) {
       return setError('Please select a seat first.');
     }
 
     setBooking(true);
-
     setError('');
 
     try {
-
       const { data } = await API.post('/bookings', {
-
         flightId: id,
-
         seatNumber: selectedSeat.seatNumber,
-
         ...passenger
-
       });
 
       setSuccess(data);
 
     } catch (err) {
-
       setError(
         err.response?.data?.message ||
         'Booking failed. Please try again.'
       );
 
     } finally {
-
       setBooking(false);
-
     }
-
   };
 
   if (loading) {
@@ -214,20 +185,16 @@ export default function BookFlight() {
   const rows = {};
 
   flight.seats.forEach(seat => {
-
     const row = seat.seatNumber.slice(0, -1);
 
     if (!rows[row]) rows[row] = [];
 
     rows[row].push(seat);
-
   });
 
   // SUCCESS PAGE
   if (success) {
-
     return (
-
       <div
         className="container"
         style={{
@@ -235,7 +202,6 @@ export default function BookFlight() {
           padding: '60px 20px'
         }}
       >
-
         <div className="card success-card">
 
           <div className="success-icon">
@@ -290,7 +256,6 @@ export default function BookFlight() {
                 ₹{success.amountPaid?.toLocaleString()}
               </strong>
             </span>
-
           </div>
 
           <div
@@ -300,7 +265,6 @@ export default function BookFlight() {
               marginTop: '20px'
             }}
           >
-
             <button
               className="btn btn-gold"
               style={{ flex: 1 }}
@@ -316,19 +280,14 @@ export default function BookFlight() {
             >
               Book Another
             </button>
-
           </div>
 
         </div>
-
       </div>
-
     );
-
   }
 
   return (
-
     <div className="book-page container">
 
       <div className="page-header">
@@ -415,23 +374,24 @@ export default function BookFlight() {
                   }
 
                   return (
-
                     <div
                       key={seat.seatNumber}
-                      className={`seat economy ${seat.isBooked ? 'booked' : ''} ${selectedSeat?.seatNumber === seat.seatNumber ? 'selected' : ''}`}
-
+                      className={`seat economy ${
+                        seat.isBooked ? 'booked' : ''
+                      } ${
+                        selectedSeat?.seatNumber === seat.seatNumber
+                          ? 'selected'
+                          : ''
+                      }`}
                       onClick={() =>
-                      !seat.isBooked &&
-                      lockSeat(seat)
+                        !seat.isBooked &&
+                        lockSeat(seat)
                       }
-
                       title={`Seat ${seat.seatNumber} · Economy · ₹${flight.priceEconomy?.toLocaleString()}`}
                     >
                       {seat.seatNumber}
                     </div>
-
                   );
-
                 })}
 
                 <span className="aisle"></span>
@@ -452,27 +412,27 @@ export default function BookFlight() {
                   }
 
                   return (
-
                     <div
                       key={seat.seatNumber}
-                      className={`seat economy ${seat.isBooked ? 'booked' : ''} ${selectedSeat?.seatNumber === seat.seatNumber ? 'selected' : ''}`}
-
+                      className={`seat economy ${
+                        seat.isBooked ? 'booked' : ''
+                      } ${
+                        selectedSeat?.seatNumber === seat.seatNumber
+                          ? 'selected'
+                          : ''
+                      }`}
                       onClick={() =>
-                      !seat.isBooked &&
-                      lockSeat(seat)
+                        !seat.isBooked &&
+                        lockSeat(seat)
                       }
-
                       title={`Seat ${seat.seatNumber} · Economy · ₹${flight.priceEconomy?.toLocaleString()}`}
                     >
                       {seat.seatNumber}
                     </div>
-
                   );
-
                 })}
 
               </div>
-
             ))}
 
           </div>
@@ -501,7 +461,6 @@ export default function BookFlight() {
                   cursor: 'pointer',
                   fontSize: '12px'
                 }}
-
                 onClick={() =>
                   setSelectedSeat(null)
                 }
@@ -510,7 +469,6 @@ export default function BookFlight() {
               </button>
 
             </div>
-
           )}
 
         </div>
@@ -538,14 +496,12 @@ export default function BookFlight() {
 
               <input
                 value={passenger.passengerName}
-
                 onChange={e =>
                   setPassenger({
                     ...passenger,
                     passengerName: e.target.value
                   })
                 }
-
                 required
               />
 
@@ -557,16 +513,13 @@ export default function BookFlight() {
 
               <input
                 type="email"
-
                 value={passenger.passengerEmail}
-
                 onChange={e =>
                   setPassenger({
                     ...passenger,
                     passengerEmail: e.target.value
                   })
                 }
-
                 required
               />
 
@@ -580,18 +533,14 @@ export default function BookFlight() {
 
               <input
                 type="tel"
-
                 value={passenger.passengerPhone}
-
                 placeholder="+91 98765 43210"
-
                 onChange={e =>
                   setPassenger({
                     ...passenger,
                     passengerPhone: e.target.value
                   })
                 }
-
                 required
               />
 
@@ -605,20 +554,15 @@ export default function BookFlight() {
 
               <input
                 type="number"
-
                 min="1"
-
                 max="120"
-
                 value={passenger.passengerAge}
-
                 onChange={e =>
                   setPassenger({
                     ...passenger,
                     passengerAge: e.target.value
                   })
                 }
-
                 required
               />
 
@@ -654,7 +598,6 @@ export default function BookFlight() {
                     }
                   )}
                 </span>
-
               </div>
 
               <div className="summary-row">
@@ -670,7 +613,6 @@ export default function BookFlight() {
                     ? `${selectedSeat.seatNumber} (Economy)`
                     : '—'}
                 </span>
-
               </div>
 
               <div className="summary-row total">
@@ -689,24 +631,18 @@ export default function BookFlight() {
 
             <button
               type="button"
-
               className="btn btn-gold"
-
               style={{
                 width: '100%',
                 justifyContent: 'center',
                 padding: '12px'
               }}
-
               disabled={!selectedSeat || booking}
-
               onClick={handlePayment}
             >
-
               {booking
                 ? 'Processing...'
                 : 'Pay & Book Flight'}
-
             </button>
 
           </form>
@@ -716,7 +652,5 @@ export default function BookFlight() {
       </div>
 
     </div>
-
   );
-
 }
