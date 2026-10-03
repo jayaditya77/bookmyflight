@@ -12,6 +12,18 @@ services:
     env_file:
       - ./backend/.env
 
+  booking-worker:
+
+    build: ./backend
+
+    command: npm run worker
+
+    env_file:
+      - ./backend/.env
+
+    depends_on:
+      - backend
+
   frontend:
 
     build: ./frontend

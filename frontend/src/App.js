@@ -8,6 +8,9 @@ import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import VerifyEmail from './pages/VerifyEmail';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Flights from './pages/Flights';
 import BookFlight from './pages/BookFlight';
 import MyBookings from './pages/MyBookings';
@@ -23,6 +26,9 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/flights" element={<Flights />} />
           <Route path="/book/:id" element={<BookFlight />} />
           <Route path="/my-bookings" element={<MyBookings />} />

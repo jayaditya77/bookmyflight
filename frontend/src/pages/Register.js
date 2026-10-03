@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import API from '../utils/api';
 import './Auth.css';
 
@@ -8,7 +7,6 @@ export default function Register() {
   const [form, setForm] = useState({ name: '', email: '', password: '', phone: '', role: 'user', adminSecret: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -17,8 +15,9 @@ export default function Register() {
     setLoading(true);
     try {
       const { data } = await API.post('/auth/register', form);
-      login(data);
-      navigate(data.role === 'admin' ? '/admin' : '/flights');
+      navigate(`/verify-email?email=${encodeURIComponent(form.email)}`, {
+        state: { message: data.message }
+      });
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed');
     } finally {

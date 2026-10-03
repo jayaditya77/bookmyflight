@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import API from '../utils/api';
+import socket from '../utils/socket';
 import './BookFlight.css';
 
 export default function BookFlight() {
@@ -12,6 +13,8 @@ export default function BookFlight() {
 
   const [flight, setFlight] = useState(null);
   const [selectedSeat, setSelectedSeat] = useState(null);
+  const [seatLocks, setSeatLocks] = useState({});
+  const [clock, setClock] = useState(Date.now());
 
   const [passenger, setPassenger] = useState({
     passengerName: user?.name || '',
@@ -25,10 +28,22 @@ export default function BookFlight() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
 
+  const releaseSeatLock = async (seat) => {
+    if (!seat) return;
+    try {
+      await API.post('/bookings/release-seat', {
+        flightId: id,
+        seatNumber: seat.seatNumber
+      });
+    } catch {
+      // The Redis TTL still releases the lock if this request fails.
+    }
+  };
+
   // LOCK SEAT
   const lockSeat = async (seat) => {
     try {
-      await API.post(
+      const { data } = await API.post(
         '/bookings/lock-seat',
         {
           flightId: id,
@@ -36,6 +51,10 @@ export default function BookFlight() {
         }
       );
 
+      setSeatLocks((current) => ({
+        ...current,
+        [seat.seatNumber]: { expiresAt: data.expiresAt, isMine: true }
+      }));
       setSelectedSeat(seat);
 
       toast.success(
@@ -70,6 +89,111 @@ export default function BookFlight() {
 
   }, [id, user, navigate]);
 
+  useEffect(() => {
+    if (!id || !user) return undefined;
+
+    const handleSeatLocked = ({ seatNumber, expiresAt }) => {
+      setSeatLocks((current) => {
+        const existing = current[seatNumber];
+        if (existing && existing.expiresAt > expiresAt) return current;
+        return { ...current, [seatNumber]: { expiresAt, isMine: false } };
+      });
+    };
+
+    const handleSeatUnlocked = ({ seatNumber }) => {
+      setSeatLocks((current) => {
+        const next = { ...current };
+        delete next[seatNumber];
+        return next;
+      });
+      setSelectedSeat((current) => current?.seatNumber === seatNumber ? null : current);
+    };
+
+    const handleSeatBooked = ({ seatNumber }) => {
+      setSeatLocks((current) => {
+        const next = { ...current };
+        delete next[seatNumber];
+        return next;
+      });
+      setSelectedSeat((current) => current?.seatNumber === seatNumber ? null : current);
+      setFlight((current) => {
+        if (!current || current.seats.some((seat) => seat.seatNumber === seatNumber && seat.isBooked)) {
+          return current;
+        }
+        return {
+          ...current,
+          availableSeats: Math.max(0, current.availableSeats - 1),
+          seats: current.seats.map((seat) => seat.seatNumber === seatNumber
+            ? { ...seat, isBooked: true }
+            : seat)
+        };
+      });
+    };
+
+    socket.on('seatLocked', handleSeatLocked);
+    socket.on('seatUnlocked', handleSeatUnlocked);
+    socket.on('seatBooked', handleSeatBooked);
+    socket.connect();
+    socket.emit('joinFlight', id);
+
+    return () => {
+      socket.emit('leaveFlight', id);
+      socket.off('seatLocked', handleSeatLocked);
+      socket.off('seatUnlocked', handleSeatUnlocked);
+      socket.off('seatBooked', handleSeatBooked);
+      socket.disconnect();
+    };
+  }, [id, user]);
+
+  useEffect(() => {
+    if (!flight || !id || !user) return undefined;
+    let cancelled = false;
+
+    API.get(`/bookings/seat-locks/${id}`)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const locks = Object.fromEntries(data.map((lock) => [lock.seatNumber, lock]));
+        setSeatLocks((current) => {
+          const merged = { ...current };
+          data.forEach((lock) => {
+            if (!merged[lock.seatNumber] || merged[lock.seatNumber].expiresAt < lock.expiresAt) {
+              merged[lock.seatNumber] = lock;
+            }
+          });
+          return merged;
+        });
+        const ownLock = data.find((lock) => lock.isMine);
+        if (ownLock) {
+          const ownSeat = flight.seats.find((seat) => seat.seatNumber === ownLock.seatNumber);
+          if (ownSeat) setSelectedSeat((current) => current || ownSeat);
+        }
+      })
+      .catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [flight, id, user]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const expiredSeats = Object.entries(seatLocks)
+      .filter(([, lock]) => lock.expiresAt <= clock)
+      .map(([seatNumber]) => seatNumber);
+    if (!expiredSeats.length) return;
+
+    setSeatLocks((current) => {
+      const next = { ...current };
+      expiredSeats.forEach((seatNumber) => {
+        if (next[seatNumber]?.expiresAt <= clock) delete next[seatNumber];
+      });
+      return next;
+    });
+    setSelectedSeat((current) => expiredSeats.includes(current?.seatNumber) ? null : current);
+  }, [clock, seatLocks]);
+
   // RAZORPAY PAYMENT
   const handlePayment = async () => {
     if (!selectedSeat) {
@@ -77,6 +201,8 @@ export default function BookFlight() {
     }
 
     try {
+      let paymentCompleted = false;
+      let paymentFailed = false;
       const { data: order } = await API.post(
         '/payment/create-order',
         {
@@ -85,7 +211,7 @@ export default function BookFlight() {
       );
 
       const options = {
-        key: process.env.REACT_APP_RAZORPAY_KEY_ID,
+        key: order.key_id,
 
         amount: order.amount,
 
@@ -98,6 +224,7 @@ export default function BookFlight() {
         order_id: order.id,
 
         handler: async function (response) {
+          paymentCompleted = true;
           try {
             const verify = await API.post(
               '/payment/verify',
@@ -115,16 +242,35 @@ export default function BookFlight() {
           }
         },
 
+        modal: {
+          ondismiss: () => {
+            if (!paymentCompleted && !paymentFailed) {
+              releaseSeatLock(selectedSeat);
+              setSelectedSeat(null);
+              setError('Checkout closed. The seat hold has been released.');
+            }
+          }
+        },
+
         theme: {
           color: '#d4af37'
         }
       };
 
       const razor = new window.Razorpay(options);
+      razor.on('payment.failed', (response) => {
+        paymentFailed = true;
+        razor.close();
+        releaseSeatLock(selectedSeat);
+        setSelectedSeat(null);
+        setError(response.error?.description || 'Payment failed. You can retry or close checkout.');
+      });
 
       razor.open();
 
     } catch {
+      await releaseSeatLock(selectedSeat);
+      setSelectedSeat(null);
       setError('Payment failed.');
     }
   };
@@ -191,6 +337,36 @@ export default function BookFlight() {
 
     rows[row].push(seat);
   });
+
+  const formatCountdown = (expiresAt) => {
+    const seconds = Math.max(0, Math.ceil((expiresAt - clock) / 1000));
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  };
+
+  const renderSeat = (seat) => {
+    const lock = seatLocks[seat.seatNumber];
+    const activeLock = lock && lock.expiresAt > clock;
+    const isMine = lock?.isMine || selectedSeat?.seatNumber === seat.seatNumber;
+    const stateClass = seat.isBooked ? 'booked' : isMine ? 'selected' : activeLock ? 'locked' : 'available';
+    const seatTitle = seat.isBooked
+      ? `Seat ${seat.seatNumber} · Booked`
+      : activeLock && !isMine
+      ? `Seat ${seat.seatNumber} · Temporarily locked · ${formatCountdown(lock.expiresAt)} remaining`
+      : `Seat ${seat.seatNumber} · Economy · ₹${flight.priceEconomy?.toLocaleString()}`;
+
+    return (
+      <div
+        key={seat.seatNumber}
+        className={`seat economy ${stateClass}`}
+        onClick={() => !seat.isBooked && (!activeLock || isMine) && lockSeat(seat)}
+        title={seatTitle}
+        aria-label={seatTitle}
+      >
+        <span>{seat.seatNumber}</span>
+        {activeLock && <small>{formatCountdown(lock.expiresAt)}</small>}
+      </div>
+    );
+  };
 
   // SUCCESS PAGE
   if (success) {
@@ -321,13 +497,18 @@ export default function BookFlight() {
             </div>
 
             <div className="legend-item">
-              <div className="seat-demo booked"></div>
-              Booked
+              <div className="seat-demo selected"></div>
+              My selection
             </div>
 
             <div className="legend-item">
-              <div className="seat-demo selected"></div>
-              Selected
+              <div className="seat-demo locked"></div>
+              Temporarily locked
+            </div>
+
+            <div className="legend-item">
+              <div className="seat-demo booked"></div>
+              Booked
             </div>
 
           </div>
@@ -373,25 +554,7 @@ export default function BookFlight() {
                     );
                   }
 
-                  return (
-                    <div
-                      key={seat.seatNumber}
-                      className={`seat economy ${
-                        seat.isBooked ? 'booked' : ''
-                      } ${
-                        selectedSeat?.seatNumber === seat.seatNumber
-                          ? 'selected'
-                          : ''
-                      }`}
-                      onClick={() =>
-                        !seat.isBooked &&
-                        lockSeat(seat)
-                      }
-                      title={`Seat ${seat.seatNumber} · Economy · ₹${flight.priceEconomy?.toLocaleString()}`}
-                    >
-                      {seat.seatNumber}
-                    </div>
-                  );
+                  return renderSeat(seat);
                 })}
 
                 <span className="aisle"></span>
@@ -411,25 +574,7 @@ export default function BookFlight() {
                     );
                   }
 
-                  return (
-                    <div
-                      key={seat.seatNumber}
-                      className={`seat economy ${
-                        seat.isBooked ? 'booked' : ''
-                      } ${
-                        selectedSeat?.seatNumber === seat.seatNumber
-                          ? 'selected'
-                          : ''
-                      }`}
-                      onClick={() =>
-                        !seat.isBooked &&
-                        lockSeat(seat)
-                      }
-                      title={`Seat ${seat.seatNumber} · Economy · ₹${flight.priceEconomy?.toLocaleString()}`}
-                    >
-                      {seat.seatNumber}
-                    </div>
-                  );
+                  return renderSeat(seat);
                 })}
 
               </div>
@@ -451,6 +596,11 @@ export default function BookFlight() {
               <strong>
                 ₹{flight.priceEconomy?.toLocaleString()}
               </strong>
+              <span className="hold-countdown">
+                Hold expires in {seatLocks[selectedSeat.seatNumber]
+                  ? formatCountdown(seatLocks[selectedSeat.seatNumber].expiresAt)
+                  : '0:00'}
+              </span>
 
               <button
                 style={{
@@ -461,9 +611,10 @@ export default function BookFlight() {
                   cursor: 'pointer',
                   fontSize: '12px'
                 }}
-                onClick={() =>
-                  setSelectedSeat(null)
-                }
+                onClick={async () => {
+                  await releaseSeatLock(selectedSeat);
+                  setSelectedSeat(null);
+                }}
               >
                 ✕ Clear
               </button>

@@ -3,13 +3,23 @@ const router = express.Router();
 const Flight = require('../models/Flight');
 const { protect, adminOnly } = require('../middleware/auth');
 
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // Search flights (public)
 router.get('/search', async (req, res) => {
   const { origin, destination, date } = req.query;
   try {
     const query = { status: 'scheduled' };
-    if (origin) query.originCode = origin.toUpperCase();
-    if (destination) query.destinationCode = destination.toUpperCase();
+    const routeFilters = [];
+    if (origin) {
+      const term = new RegExp(escapeRegex(String(origin).trim()), 'i');
+      routeFilters.push({ $or: [{ origin: term }, { originCode: term }] });
+    }
+    if (destination) {
+      const term = new RegExp(escapeRegex(String(destination).trim()), 'i');
+      routeFilters.push({ $or: [{ destination: term }, { destinationCode: term }] });
+    }
+    if (routeFilters.length) query.$and = routeFilters;
     if (date) {
       const start = new Date(date);
       const end = new Date(date);

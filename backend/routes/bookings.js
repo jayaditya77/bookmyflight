@@ -5,7 +5,47 @@ const Flight = require('../models/Flight');
 const { protect } = require('../middleware/auth');
 const redisClient = require('../config/redis');
 
-const sendBookingEmail = require('../utils/sendEmail');
+const bookingQueue = require('../queues/bookingQueue');
+const LOCK_TTL_SECONDS = 300;
+const lockExpiryTimers = new Map();
+
+const clearLockExpiryTimer = (lockKey) => {
+  const timer = lockExpiryTimers.get(lockKey);
+  if (timer) clearTimeout(timer);
+  lockExpiryTimers.delete(lockKey);
+};
+
+const scheduleLockExpiryBroadcast = (io, flightId, seatNumber, ownerId, expiresAt) => {
+  const lockKey = `lock:${flightId}:${seatNumber}`;
+  clearLockExpiryTimer(lockKey);
+
+  const timer = setTimeout(async () => {
+    lockExpiryTimers.delete(lockKey);
+    try {
+      const currentOwner = await redisClient.get(lockKey);
+      if (currentOwner && currentOwner !== ownerId) return;
+
+      const stillExpired = await redisClient.eval(
+        "if redis.call('exists', KEYS[1]) == 0 then return 1 else return 0 end",
+        { keys: [lockKey], arguments: [] }
+      );
+      if (stillExpired === 1) {
+        io.to(`flight:${flightId}`).emit('seatUnlocked', { flightId, seatNumber });
+        return;
+      }
+
+      const ttl = await redisClient.ttl(lockKey);
+      if (ttl > 0 && currentOwner === ownerId) {
+        scheduleLockExpiryBroadcast(io, flightId, seatNumber, ownerId, Date.now() + ttl * 1000);
+      }
+    } catch (err) {
+      console.error('Seat lock expiry check failed:', err.message);
+    }
+  }, Math.max(0, expiresAt - Date.now()));
+
+  timer.unref?.();
+  lockExpiryTimers.set(lockKey, timer);
+};
 
 // Lock Seat
 router.post('/lock-seat', protect, async (req, res) => {
@@ -13,32 +53,36 @@ router.post('/lock-seat', protect, async (req, res) => {
   try {
 
     const { flightId, seatNumber } = req.body;
-
-    const lockKey = `lock:${flightId}:${seatNumber}`;
-
-    // Check if already locked
-    const existingLock = await redisClient.get(lockKey);
-
-    if (existingLock && existingLock !== req.user._id.toString()) {
-
-    return res.status(400).json({
-    message: 'Seat temporarily locked by another user'
-    });
-
+    if (!flightId || !seatNumber) {
+      return res.status(400).json({ message: 'Flight and seat are required.' });
     }
 
-    // Lock seat for 5 minutes
-    await redisClient.set(
-      lockKey,
-      req.user._id.toString(),
-      {
-        EX: 300
-      }
+    const flight = await Flight.findById(flightId).select('seats');
+    if (!flight) return res.status(404).json({ message: 'Flight not found.' });
+    const seat = flight.seats.find((item) => item.seatNumber === seatNumber);
+    if (!seat || seat.isBooked) {
+      return res.status(400).json({ message: 'Seat is not available.' });
+    }
+
+    const lockKey = `lock:${flightId}:${seatNumber}`;
+    const ownerId = req.user._id.toString();
+    const acquired = await redisClient.eval(
+      "local owner = redis.call('get', KEYS[1]); if not owner or owner == ARGV[1] then redis.call('set', KEYS[1], ARGV[1], 'EX', ARGV[2]); return 1 else return 0 end",
+      { keys: [lockKey], arguments: [ownerId, String(LOCK_TTL_SECONDS)] }
     );
+    if (acquired !== 1) {
+      return res.status(409).json({ message: 'Seat temporarily locked by another user.' });
+    }
+
+    const expiresAt = Date.now() + LOCK_TTL_SECONDS * 1000;
+    const io = req.app.get('io');
+    scheduleLockExpiryBroadcast(io, flightId, seatNumber, ownerId, expiresAt);
+    io.to(`flight:${flightId}`).emit('seatLocked', { flightId, seatNumber, expiresAt });
 
     res.json({
       message: 'Seat locked successfully',
-      expiresIn: 300
+      expiresIn: LOCK_TTL_SECONDS,
+      expiresAt
     });
 
   } catch (err) {
@@ -49,6 +93,57 @@ router.post('/lock-seat', protect, async (req, res) => {
 
   }
 
+});
+
+router.get('/seat-locks/:flightId', protect, async (req, res) => {
+  try {
+    const flight = await Flight.findById(req.params.flightId).select('seats');
+    if (!flight) return res.status(404).json({ message: 'Flight not found.' });
+
+    const locks = await Promise.all(flight.seats.map(async (seat) => {
+      if (seat.isBooked) return null;
+      const lockKey = `lock:${req.params.flightId}:${seat.seatNumber}`;
+      const ownerId = await redisClient.get(lockKey);
+      if (!ownerId) return null;
+      const ttl = await redisClient.ttl(lockKey);
+      if (ttl <= 0) return null;
+      return {
+        seatNumber: seat.seatNumber,
+        isMine: ownerId === req.user._id.toString(),
+        expiresAt: Date.now() + ttl * 1000
+      };
+    }));
+
+    res.json(locks.filter(Boolean));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.post('/release-seat', protect, async (req, res) => {
+  const { flightId, seatNumber } = req.body;
+  if (!flightId || !seatNumber) {
+    return res.status(400).json({ message: 'Flight and seat are required.' });
+  }
+
+  try {
+    const lockKey = `lock:${flightId}:${seatNumber}`;
+    const released = await redisClient.eval(
+      "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+      {
+        keys: [lockKey],
+        arguments: [req.user._id.toString()]
+      }
+    );
+
+    if (released === 1) {
+      clearLockExpiryTimer(lockKey);
+      req.app.get('io').to(`flight:${flightId}`).emit('seatUnlocked', { flightId, seatNumber });
+    }
+    res.json({ released: released === 1 });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // Book a flight — tourists only
@@ -134,25 +229,22 @@ router.post('/', protect, async (req, res) => {
       'flightNumber airline origin destination departureDate departureTime arrivalTime originCode destinationCode'
     );
 
-    console.log("EMAIL:", booking.passengerEmail);
+    clearLockExpiryTimer(lockKey);
+    req.app.get('io').to(`flight:${flightId}`).emit('seatBooked', { flightId, seatNumber });
 
+    let confirmationQueued = false;
     try {
-
-      await sendBookingEmail(
-        booking.passengerEmail,
-        booking,
-        flight
+      await bookingQueue.add(
+        'send-booking-confirmation',
+        { bookingId: booking._id.toString() },
+        { jobId: `booking-confirmation-${booking._id}` }
       );
-
-      console.log("EMAIL FUNCTION EXECUTED");
-
-    } catch (emailErr) {
-
-      console.log("EMAIL FAILED:", emailErr);
-
+      confirmationQueued = true;
+    } catch (queueError) {
+      console.error('Could not queue booking confirmation:', queueError.message);
     }
 
-    res.status(201).json(booking);
+    res.status(201).json({ ...booking.toObject(), confirmationQueued });
 
   } catch (err) {
 

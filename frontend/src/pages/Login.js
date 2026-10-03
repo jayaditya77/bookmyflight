@@ -7,6 +7,7 @@ import './Auth.css';
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [requiresVerification, setRequiresVerification] = useState(false);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setRequiresVerification(false);
     setLoading(true);
     try {
       const { data } = await API.post('/auth/login', form);
@@ -21,6 +23,7 @@ export default function Login() {
       navigate(data.role === 'admin' ? '/admin' : '/flights');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');
+      setRequiresVerification(Boolean(err.response?.data?.requiresEmailVerification));
     } finally {
       setLoading(false);
     }
@@ -36,6 +39,15 @@ export default function Login() {
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}
+        {requiresVerification && (
+          <button
+            type="button"
+            className="auth-text-button"
+            onClick={() => navigate(`/verify-email?email=${encodeURIComponent(form.email)}`)}
+          >
+            Resend verification email
+          </button>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
@@ -65,6 +77,9 @@ export default function Login() {
 
         <div className="auth-footer">
           Don't have an account? <Link to="/register">Register here</Link>
+        </div>
+        <div className="auth-footer" style={{ marginTop: '8px' }}>
+          <Link to="/forgot-password">Forgot your password?</Link>
         </div>
       </div>
     </div>

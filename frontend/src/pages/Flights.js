@@ -6,26 +6,38 @@ import './Flights.css';
 
 export default function Flights() {
   const [flights, setFlights] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [filter, setFilter] = useState({
+  const initialFilter = {
     origin: searchParams.get('origin') || '',
     destination: searchParams.get('destination') || '',
     date: searchParams.get('date') || ''
-  });
+  };
+  const hasInitialRoute = Boolean(initialFilter.origin || initialFilter.destination);
+  const [filter, setFilter] = useState(initialFilter);
+  const [loading, setLoading] = useState(hasInitialRoute);
+  const [hasSearched, setHasSearched] = useState(hasInitialRoute);
 
   const fetchFlights = async () => {
+    const origin = filter.origin.trim();
+    const destination = filter.destination.trim();
+    if (!origin && !destination) {
+      setFlights([]);
+      setHasSearched(false);
+      setLoading(false);
+      return;
+    }
+
+    setHasSearched(true);
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filter.origin) params.set('origin', filter.origin);
-      if (filter.destination) params.set('destination', filter.destination);
+      if (origin) params.set('origin', origin);
+      if (destination) params.set('destination', destination);
       if (filter.date) params.set('date', filter.date);
-      const endpoint = params.toString() ? `/flights/search?${params}` : '/flights';
-      const { data } = await API.get(endpoint);
+      const { data } = await API.get(`/flights/search?${params}`);
       setFlights(data);
     } catch {
       setFlights([]);
@@ -34,7 +46,16 @@ export default function Flights() {
     }
   };
 
-  useEffect(() => { fetchFlights(); }, []);
+  useEffect(() => {
+    if (hasInitialRoute) fetchFlights();
+  }, []);
+
+  const clearSearch = () => {
+    setFilter({ origin: '', destination: '', date: '' });
+    setFlights([]);
+    setHasSearched(false);
+    setLoading(false);
+  };
 
   const handleBook = (flightId) => {
     if (!user) { navigate('/login'); return; }
@@ -54,13 +75,13 @@ export default function Flights() {
       <div className="filter-bar card">
         <div className="filter-row">
           <div className="form-group" style={{ margin: 0, flex: 1 }}>
-            <label>From</label>
-            <input type="text" placeholder="Origin code (e.g. DEL)"
+            <label>From (departure)</label>
+            <input type="text" placeholder="City or airport code"
               value={filter.origin} onChange={e => setFilter({ ...filter, origin: e.target.value })} />
           </div>
           <div className="form-group" style={{ margin: 0, flex: 1 }}>
-            <label>To</label>
-            <input type="text" placeholder="Destination code (e.g. BOM)"
+            <label>To (arrival)</label>
+            <input type="text" placeholder="City or airport code"
               value={filter.destination} onChange={e => setFilter({ ...filter, destination: e.target.value })} />
           </div>
           <div className="form-group" style={{ margin: 0, flex: 1 }}>
@@ -68,15 +89,21 @@ export default function Flights() {
             <input type="date" value={filter.date}
               onChange={e => setFilter({ ...filter, date: e.target.value })} />
           </div>
-          <button className="btn btn-gold" style={{ alignSelf: 'flex-end' }} onClick={fetchFlights}>Search</button>
+          <button className="btn btn-gold" style={{ alignSelf: 'flex-end' }} onClick={fetchFlights}
+            disabled={!filter.origin.trim() && !filter.destination.trim()}>Search</button>
           <button className="btn btn-outline" style={{ alignSelf: 'flex-end' }}
-            onClick={() => { setFilter({ origin: '', destination: '', date: '' }); setTimeout(fetchFlights, 100); }}>
+            onClick={clearSearch}>
             Clear
           </button>
         </div>
       </div>
 
-      {loading ? (
+      {!hasSearched ? (
+        <div className="empty-state">
+          <div className="icon">✈</div>
+          <p>Search by departure or arrival city to see available flights.</p>
+        </div>
+      ) : loading ? (
         <div className="loading">Loading flights...</div>
       ) : flights.length === 0 ? (
         <div className="empty-state">

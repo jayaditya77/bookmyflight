@@ -61,6 +61,19 @@
 }
 .auth-footer a:hover { text-decoration: underline; }
 
+.auth-text-button {
+  display: block;
+  width: 100%;
+  margin: -4px 0 14px;
+  padding: 0;
+  background: transparent;
+  color: var(--gold-dark);
+  font-size: 12px;
+  font-weight: bold;
+  text-align: right;
+}
+.auth-text-button:hover { text-decoration: underline; }
+
 /* Role dropdown */
 .role-select {
   width: 100%;
